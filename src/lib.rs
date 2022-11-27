@@ -349,7 +349,7 @@ fn bind_unix(fd: c_int, path: String) -> i32 {
     let mut stpath = [0u8; 108];
     let mut bytes = path.bytes();
     for i in 0..size {
-        stpath[i] = bytes.nth(i).unwrap();
+        stpath[i] = bytes.next().unwrap();
     }
     stpath[size] = 0;
 
