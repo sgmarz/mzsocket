@@ -17,34 +17,18 @@ extern "C" {
     fn close(fd: c_int);
 }
 
-// template<typename T>
-// T byteswap(T input) {
-//     if (sizeof(T) <= 1)
-//         return input;
-
-//     const uint64_t bitlen = sizeof(T) * 8;
-//     T output = 0;
-//     uint64_t i;
-//     uint64_t bs = bitlen - 8;
-//     for (i = 0;i < bitlen;i+=8) {
-//         output |= ((input >> bs) & 0xFF) << i;
-//         bs -= 8;
-//     }
-//     return output;
-// }
-
 pub struct Socket {
     fd: c_int,
 }
 
 impl Socket {
-    pub fn new(family: AddressFamily, st: SocketType, proto: Option<IpProto>) -> Option<Self> {
+    pub fn new(family: AddressFamily, st: SocketType, proto: Option<IpProto>) -> Result<Self, i32> {
         let pr = proto.unwrap_or(IpProto::Ip);
         let ws = safe_socket(family, st, pr);
         if ws < 0 {
-            None
+            Err(ws)
         } else {
-            Some(Self { fd: ws })
+            Ok(Self { fd: ws })
         }
     }
 
