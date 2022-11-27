@@ -264,11 +264,13 @@ impl Default for Inet6SockAddr {
     }
 }
 
+pub const UNIX_PATH_LEN: usize = 108;
 #[repr(C)]
 pub struct UnixSockAddr {
     family: u16,
-    path: [u8; 108],
+    path: [u8; UNIX_PATH_LEN],
 }
+
 
 impl Default for UnixSockAddr {
     fn default() -> Self {
@@ -343,7 +345,7 @@ fn bind_inet6(fd: c_int, ipaddr: u128, port: u16) -> i32 {
 }
 
 fn bind_unix(fd: c_int, path: String) -> i32 {
-    let size = if path.len() <= 107 { path.len() } else { 107 };
+    let size = if path.len() < (UNIX_PATH_LEN - 1) { path.len() } else { UNIX_PATH_LEN - 1 };
     let mut stpath = [0u8; 108];
     let mut bytes = path.bytes();
     for i in 0..size {
