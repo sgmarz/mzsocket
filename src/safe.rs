@@ -24,9 +24,9 @@
 //!
 //!
 
+use super::structs::UNIX_PATH_LEN;
 use super::{
     AddressFamily, BindFamily, Inet6SockAddr, InetSockAddr, IpProto, SocketType, UnixSockAddr,
-    UNIX_PATH_LEN,
 };
 use std::ffi::{c_int, c_uint, c_ushort, c_void};
 use std::mem::size_of;

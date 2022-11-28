@@ -24,6 +24,7 @@
 //! 
 
 mod safe;
+mod structs;
 
 use std::{
     ffi::{c_int, c_longlong, c_uchar, c_uint, c_ulonglong, c_void},
@@ -37,6 +38,16 @@ extern "C" {
     fn write(fd: c_int, buffer: *const c_uchar, buflen: c_ulonglong) -> c_longlong;
     fn fcntl(fd: c_int, cmd: c_int, val: c_int) -> c_int;
 }
+
+// Re-exports
+
+pub type AddressFamily = structs::AddressFamily;
+pub type SocketType = structs::SocketType;
+pub type IpProto = structs::IpProto;
+pub type BindFamily = structs::BindFamily;
+pub type InetSockAddr = structs::InetSockAddr;
+pub type Inet6SockAddr = structs::Inet6SockAddr;
+pub type UnixSockAddr = structs::UnixSockAddr;
 
 pub struct Socket {
     fd: c_int,
@@ -177,106 +188,7 @@ impl Drop for Socket {
     }
 }
 
-#[repr(C)]
-#[allow(dead_code)]
-pub enum BindFamily {
-    Unix(String),
-    Inet(u32, u16),
-    Inet6(u128, u16),
-}
 
-#[repr(C)]
-#[allow(dead_code)]
-#[derive(Copy, Clone)]
-pub enum AddressFamily {
-    Unspec = 0,
-    Unix = 1,
-    Inet = 2,
-    Inet6 = 10,
-}
-
-#[repr(C)]
-#[allow(dead_code)]
-#[derive(Copy, Clone)]
-pub enum SocketType {
-    Stream = 1,
-    DataGram = 2,
-    Raw = 3,
-    SeqPacket = 5,
-    Packet = 10,
-}
-
-#[repr(C)]
-#[allow(dead_code)]
-#[derive(Copy, Clone)]
-pub enum IpProto {
-    Ip = 0,
-    Icmp = 1,
-    Igmp = 2,
-    IpIp = 4,
-    Tcp = 6,
-    Udp = 17,
-    Ipv6 = 41,
-    Gre = 47,
-    Esp = 50,
-    Ah = 51,
-}
-
-#[repr(C)]
-pub struct InetSockAddr {
-    family: u16,
-    port: u16,
-    addr: u32,
-    reserved: u64,
-}
-impl Default for InetSockAddr {
-    fn default() -> Self {
-        Self {
-            family: AddressFamily::Inet as u16,
-            port: 0,
-            addr: 0,
-            reserved: 0
-        }
-    }
-}
-
-#[repr(C)]
-pub struct Inet6SockAddr {
-    family: u16,
-    port: u16,
-    flowinfo: u32,
-    addr: [u8; 16],
-    scopeid: u32,
-}
-
-impl Default for Inet6SockAddr {
-    fn default() -> Self {
-        Self {
-            family: AddressFamily::Inet6 as u16,
-            port: 0,
-            flowinfo: 0,
-            addr: [0u8; 16],
-            scopeid: 0
-        }
-    }
-}
-
-pub const UNIX_PATH_LEN: usize = 108;
-#[repr(C)]
-pub struct UnixSockAddr {
-    family: u16,
-    path: [u8; UNIX_PATH_LEN],
-}
-
-
-impl Default for UnixSockAddr {
-    fn default() -> Self {
-        Self {
-            family: AddressFamily::Unix as u16,
-            path: [0u8; 108]
-        }
-    }
-}
 
 
 
