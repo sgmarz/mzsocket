@@ -22,23 +22,20 @@
 //! OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //! THE SOFTWARE.
 //! 
+
+mod safe;
+
 use std::{
-    ffi::{c_int, c_longlong, c_uchar, c_uint, c_ulonglong, c_ushort, c_void},
+    ffi::{c_int, c_longlong, c_uchar, c_uint, c_ulonglong, c_void},
     mem::size_of,
 };
 
 extern "C" {
-    fn socket(af: c_int, socktype: c_int, proto: c_int) -> c_int;
-    fn bind(fd: c_int, s: *const c_void, slen: c_uint) -> c_int;
-    fn connect(fd: c_int, s: *const c_void, slen: c_uint) -> c_int;
     fn listen(fd: c_int, backlog: c_int) -> c_int;
     fn accept(fd: c_int, s: *mut c_void, slen: *mut c_uint) -> c_int;
     fn read(fd: c_int, buffer: *mut c_uchar, buflen: c_ulonglong) -> c_longlong;
     fn write(fd: c_int, buffer: *const c_uchar, buflen: c_ulonglong) -> c_longlong;
-    fn htons(val: c_ushort) -> c_ushort;
-    fn htonl(val: c_uint) -> c_uint;
     fn fcntl(fd: c_int, cmd: c_int, val: c_int) -> c_int;
-    fn close(fd: c_int);
 }
 
 pub struct Socket {
@@ -48,7 +45,7 @@ pub struct Socket {
 impl Socket {
     pub fn new(family: AddressFamily, st: SocketType, proto: Option<IpProto>) -> Result<Self, i32> {
         let pr = proto.unwrap_or(IpProto::Ip);
-        let ws = safe_socket(family, st, pr);
+        let ws = safe::safe_socket(family, st, pr);
         if ws < 0 {
             Err(ws)
         } else {
@@ -57,7 +54,7 @@ impl Socket {
     }
 
     pub fn bind(&mut self, bf: BindFamily) -> Result<(), i32> {
-        let r = safe_bind(self.fd, bf);
+        let r = safe::safe_bind(self.fd, bf);
         if r < 0 {
             Err(r)
         } else {
@@ -114,7 +111,7 @@ impl Socket {
     }
 
     pub fn connect(&mut self, bf: BindFamily) -> Result<(), i32> {
-        let r = safe_connect(self.fd, bf);
+        let r = safe::safe_connect(self.fd, bf);
         if r < 0 {
             Err(r)
         } else {
@@ -170,7 +167,7 @@ impl Socket {
     }
 
     pub fn close(&mut self) {
-        safe_close(self.fd);
+        safe::safe_close(self.fd);
     }
 }
 
@@ -281,175 +278,61 @@ impl Default for UnixSockAddr {
     }
 }
 
-fn safe_socket(af: AddressFamily, st: SocketType, pt: IpProto) -> i32 {
-    unsafe { socket(af as c_int, st as c_int, pt as c_int) as i32 }
-}
 
-fn safe_bind(fd: c_int, bf: BindFamily) -> i32 {
-    match bf {
-        BindFamily::Inet(addr, port) => bind_inet(fd, addr, port),
-        BindFamily::Inet6(addr, port) => bind_inet6(fd, addr, port),
-        BindFamily::Unix(path) => bind_unix(fd, path),
-    }
-}
 
-fn bind_inet(fd: c_int, ipaddr: u32, port: u16) -> i32 {
-    unsafe {
-        let isa = InetSockAddr {
-            family: AddressFamily::Inet as u16,
-            port: htons(port),
-            addr: htonl(ipaddr),
-            reserved: 0,
-        };
-        bind(
-            fd,
-            &isa as *const InetSockAddr as *const c_void,
-            size_of::<InetSockAddr>() as c_uint,
-        ) as i32
-    }
-}
-
-fn bind_inet6(fd: c_int, ipaddr: u128, port: u16) -> i32 {
-    let ips = [
-        ((ipaddr >> 120) & 0xFF) as u8,
-        ((ipaddr >> 112) & 0xFF) as u8,
-        ((ipaddr >> 104) & 0xFF) as u8,
-        ((ipaddr >> 96) & 0xFF) as u8,
-        ((ipaddr >> 88) & 0xFF) as u8,
-        ((ipaddr >> 80) & 0xFF) as u8,
-        ((ipaddr >> 72) & 0xFF) as u8,
-        ((ipaddr >> 64) & 0xFF) as u8,
-        ((ipaddr >> 56) & 0xFF) as u8,
-        ((ipaddr >> 48) & 0xFF) as u8,
-        ((ipaddr >> 40) & 0xFF) as u8,
-        ((ipaddr >> 32) & 0xFF) as u8,
-        ((ipaddr >> 24) & 0xFF) as u8,
-        ((ipaddr >> 16) & 0xFF) as u8,
-        ((ipaddr >> 8) & 0xFF) as u8,
-        (ipaddr & 0xFF) as u8,
-    ];
-    unsafe {
-        let isa = Inet6SockAddr {
-            family: AddressFamily::Inet6 as u16,
-            port: htons(port),
-            flowinfo: 0,
-            addr: ips,
-            scopeid: 0,
-        };
-        bind(
-            fd,
-            &isa as *const Inet6SockAddr as *const c_void,
-            size_of::<Inet6SockAddr>() as c_uint,
-        ) as i32
-    }
-}
-
-fn bind_unix(fd: c_int, path: String) -> i32 {
-    let size = if path.len() < (UNIX_PATH_LEN - 1) { path.len() } else { UNIX_PATH_LEN - 1 };
-    let mut stpath = [0u8; 108];
-    let mut bytes = path.bytes();
-    for i in 0..size {
-        stpath[i] = bytes.next().unwrap();
-    }
-    stpath[size] = 0;
-
-    unsafe {
-        let usa = UnixSockAddr {
-            family: AddressFamily::Unix as u16,
-            path: stpath,
-        };
-        bind(
-            fd,
-            &usa as *const UnixSockAddr as *const c_void,
-            size_of::<UnixSockAddr>() as c_uint,
-        ) as i32
-    }
-}
-
-fn safe_connect(fd: c_int, bf: BindFamily) -> i32 {
-    unsafe {
-        match bf {
-            BindFamily::Inet(addr, port) => {
-                let s = InetSockAddr {
-                    family: AddressFamily::Inet as u16,
-                    port: htons(port),
-                    addr: htonl(addr),
-                    reserved: 0,
-                };
-                connect(
-                    fd as i32,
-                    &s as *const InetSockAddr as *const c_void,
-                    size_of::<InetSockAddr>() as c_uint,
-                ) as i32
+/// Convert an Internet version 4 address from a string
+/// into a u32 address.
+/// 
+/// * Returns a `Result<u32, usize>`. If the result is Err, it will return
+/// the first index dotted quad to fail. The first dotted quad
+/// is 0, the second is 1, and so forth. If the result is Ok,
+/// the wrapped value will be a u32 of the IP address.
+/// 
+/// * Unspecified values of an incomplete IP address are set to 0.
+/// 
+/// * Returns in host byte order.
+/// 
+/// # Examples
+/// 
+/// ```
+/// // Usage with a full IPv4 address.
+/// let addr = mzsocket::inet_addr("127.64.32.8").unwrap();
+/// // prints 0x7f402008
+/// println!("0x{:08x}", addr);
+/// 
+/// // Usage and result of an incomplete IPv4 address
+/// let addr = mzsocket::inet_addr("127.64").unwrap();
+/// // prints 0x7f400000
+/// println!("0x{:08x}", addr);
+/// 
+/// // Usage and result of an unparseable IPv4 address
+/// let addr = mzsocket::inet_addr("127.168.john.p");
+/// // prints Error @ 2
+/// println!("Error @ {}", addr.unwrap_err());
+/// 
+/// // Usage and result of an IPv4 address with invalid numbers
+/// let addr = mzsocket::inet_addr("127.512.711.299");
+/// // prints Error @ 1
+/// println!("Error @ {}", addr.unwrap_err());
+pub fn inet_addr(addr: &str) -> Result<u32, usize> {
+    let mut ret = 0;
+    let mut addrs = addr.split('.');
+    for i in 0..4 {
+        if let Some(k) = addrs.next() {
+            let parsed_result = k.parse::<u32>();
+            if parsed_result.is_err() {
+                return Err(i)
             }
-            BindFamily::Inet6(ipaddr, port) => {
-                let saddr = [
-                    ((ipaddr >> 120) & 0xFF) as u8,
-                    ((ipaddr >> 112) & 0xFF) as u8,
-                    ((ipaddr >> 104) & 0xFF) as u8,
-                    ((ipaddr >> 96) & 0xFF) as u8,
-                    ((ipaddr >> 88) & 0xFF) as u8,
-                    ((ipaddr >> 80) & 0xFF) as u8,
-                    ((ipaddr >> 72) & 0xFF) as u8,
-                    ((ipaddr >> 64) & 0xFF) as u8,
-                    ((ipaddr >> 56) & 0xFF) as u8,
-                    ((ipaddr >> 48) & 0xFF) as u8,
-                    ((ipaddr >> 40) & 0xFF) as u8,
-                    ((ipaddr >> 32) & 0xFF) as u8,
-                    ((ipaddr >> 24) & 0xFF) as u8,
-                    ((ipaddr >> 16) & 0xFF) as u8,
-                    ((ipaddr >> 8) & 0xFF) as u8,
-                    (ipaddr & 0xFF) as u8,
-                ];
-                let s = Inet6SockAddr {
-                    family: AddressFamily::Inet6 as u16,
-                    port: htons(port),
-                    flowinfo: 0,
-                    addr: saddr,
-                    scopeid: 0,
-                };
-                connect(
-                    fd as i32,
-                    &s as *const Inet6SockAddr as *const c_void,
-                    size_of::<Inet6SockAddr>() as c_uint,
-                ) as i32
+            let parsed_value = parsed_result.unwrap();
+            if parsed_value > 255 {
+                return Err(i);
             }
-            BindFamily::Unix(path) => {
-                let size = if path.len() <= 107 { path.len() } else { 107 };
-                let mut stpath = [0u8; 108];
-                let mut bytes = path.bytes();
-                for i in 0..size {
-                    stpath[i] = bytes.nth(i).unwrap();
-                }
-                stpath[size] = 0;
-                let s = UnixSockAddr {
-                    family: AddressFamily::Unix as u16,
-                    path: stpath,
-                };
-                connect(
-                    fd as i32,
-                    &s as *const UnixSockAddr as *const c_void,
-                    size_of::<UnixSockAddr>() as c_uint,
-                ) as i32
-            }
+            let bitp = 8 * (3 - i);
+            ret |= parsed_value << bitp;
+        }
+        else {
+            return Ok(ret)
         }
     }
-}
-
-fn safe_close(fd: c_int) {
-    unsafe {
-        close(fd);
-    }
-}
-
-pub fn inet_addr(addr: &str) -> u32 {
-    let s = addr.split('.');
-    let mut k = s.map(|z| 
-        z.parse::<u8>().unwrap()
-    );
-
-    (k.next().unwrap() as u32) << 24 |
-    (k.next().unwrap() as u32) << 16 |
-    (k.next().unwrap() as u32) << 8  |
-    (k.next().unwrap() as u32)
+    Ok(ret)
 }
