@@ -111,8 +111,8 @@ pub(super) fn bind_unix(fd: c_int, path: String) -> i32 {
     };
     let mut stpath = [0u8; 108];
     let mut bytes = path.bytes();
-    for i in 0..size {
-        stpath[i] = bytes.next().unwrap();
+    for i in stpath.iter_mut().take(size) {
+        *i = bytes.next().unwrap();
     }
     stpath[size] = 0;
 
@@ -181,8 +181,8 @@ pub(super) fn safe_connect(fd: c_int, bf: BindFamily) -> i32 {
                 let size = if path.len() <= 107 { path.len() } else { 107 };
                 let mut stpath = [0u8; 108];
                 let mut bytes = path.bytes();
-                for i in 0..size {
-                    stpath[i] = bytes.nth(i).unwrap();
+                for i in stpath.iter_mut().take(size) {
+                    *i = bytes.next().unwrap();
                 }
                 stpath[size] = 0;
                 let s = UnixSockAddr {
