@@ -21,12 +21,10 @@
 //! LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 //! OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //! THE SOFTWARE.
-//!
-//!
 
-use super::structs::UNIX_PATH_LEN;
+use super::structs::{InetAddr, Inet6Addr, UNIX_PATH_LEN};
 use super::{
-    AddressFamily, BindFamily, Inet6SockAddr, InetSockAddr, IpProto, SocketType, UnixSockAddr,
+    AddressFamily, BindFamily, Inet6SockAddr, InetSockAddr, IpProto, SocketType, UnixSockAddr, 
 };
 use std::ffi::{c_int, c_uint, c_ushort, c_void};
 use std::mem::size_of;
@@ -57,7 +55,7 @@ pub(super) fn bind_inet(fd: c_int, ipaddr: u32, port: u16) -> i32 {
         let isa = InetSockAddr {
             family: AddressFamily::Inet as u16,
             port: htons(port),
-            addr: htonl(ipaddr),
+            addr: InetAddr::new(htonl(ipaddr)),
             reserved: 0,
         };
         bind(
@@ -69,7 +67,7 @@ pub(super) fn bind_inet(fd: c_int, ipaddr: u32, port: u16) -> i32 {
 }
 
 pub(super) fn bind_inet6(fd: c_int, ipaddr: u128, port: u16) -> i32 {
-    let ips = [
+    let saddr = [
         ((ipaddr >> 120) & 0xFF) as u8,
         ((ipaddr >> 112) & 0xFF) as u8,
         ((ipaddr >> 104) & 0xFF) as u8,
@@ -92,7 +90,7 @@ pub(super) fn bind_inet6(fd: c_int, ipaddr: u128, port: u16) -> i32 {
             family: AddressFamily::Inet6 as u16,
             port: htons(port),
             flowinfo: 0,
-            addr: ips,
+            addr: Inet6Addr::new_8(saddr),
             scopeid: 0,
         };
         bind(
@@ -136,7 +134,7 @@ pub(super) fn safe_connect(fd: c_int, bf: BindFamily) -> i32 {
                 let s = InetSockAddr {
                     family: AddressFamily::Inet as u16,
                     port: htons(port),
-                    addr: htonl(addr),
+                    addr: InetAddr::new(htonl(addr)),
                     reserved: 0,
                 };
                 connect(
@@ -168,7 +166,7 @@ pub(super) fn safe_connect(fd: c_int, bf: BindFamily) -> i32 {
                     family: AddressFamily::Inet6 as u16,
                     port: htons(port),
                     flowinfo: 0,
-                    addr: saddr,
+                    addr: Inet6Addr::new_8(saddr),
                     scopeid: 0,
                 };
                 connect(

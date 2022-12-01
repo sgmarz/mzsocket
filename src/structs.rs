@@ -21,7 +21,6 @@
 //! LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 //! OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //! THE SOFTWARE.
-//!
 
 #[repr(C)]
 #[allow(dead_code)]
@@ -68,11 +67,46 @@ pub enum IpProto {
     Ah = 51,
 }
 
+pub union InetAddr {
+    pub addr8: [u8; 4],
+    pub addr16: [u16; 2],
+    pub addr32: u32
+}
+
+impl InetAddr {
+    pub const fn new_8(addr8: [u8; 4]) -> Self {
+        Self {
+            addr8
+        }
+    }
+    pub const fn new_16(addr16: [u16; 2]) -> Self {
+        Self {
+            addr16
+        }
+    }
+    pub const fn new_32(addr32: u32) -> Self {
+        Self {
+            addr32
+        }
+    }
+    pub const fn new(addr32: u32) -> Self {
+        Self::new_32(addr32)
+    }
+}
+
+impl Default for InetAddr {
+    fn default() -> Self {
+        Self {
+            addr32: 0
+        }
+    }
+}
+
 #[repr(C)]
 pub struct InetSockAddr {
     pub family: u16,
     pub port: u16,
-    pub addr: u32,
+    pub addr: InetAddr,
     pub reserved: u64,
 }
 impl Default for InetSockAddr {
@@ -80,8 +114,52 @@ impl Default for InetSockAddr {
         Self {
             family: AddressFamily::Inet as u16,
             port: 0,
-            addr: 0,
+            addr: InetAddr::new(0),
             reserved: 0
+        }
+    }
+}
+
+pub union Inet6Addr {
+    pub addr8: [u8; 16],
+    pub addr16: [u16; 8],
+    pub addr32: [u32; 4],
+    pub addr64: [u64; 2],
+    pub addr128: u128
+}
+
+impl Inet6Addr {
+    pub const fn new_8(addr8: [u8; 16]) -> Self {
+        Self {
+            addr8
+        }
+    }
+    pub const fn new_16(addr16: [u16; 8]) -> Self {
+        Self {
+            addr16
+        }
+    }
+    pub const fn new_32(addr32: [u32; 4]) -> Self {
+        Self {
+            addr32
+        }
+    }
+    pub const fn new_64(addr64: [u64; 2]) -> Self {
+        Self {
+            addr64
+        }
+    }
+    pub const fn new_128(addr128: u128) -> Self {
+        Self {
+            addr128
+        }
+    }
+}
+
+impl Default for Inet6Addr {
+    fn default() -> Self {
+        Self {
+            addr128: 0
         }
     }
 }
@@ -91,7 +169,7 @@ pub struct Inet6SockAddr {
     pub family: u16,
     pub port: u16,
     pub flowinfo: u32,
-    pub addr: [u8; 16],
+    pub addr: Inet6Addr,
     pub scopeid: u32,
 }
 
@@ -101,7 +179,7 @@ impl Default for Inet6SockAddr {
             family: AddressFamily::Inet6 as u16,
             port: 0,
             flowinfo: 0,
-            addr: [0u8; 16],
+            addr: Inet6Addr::default(),
             scopeid: 0
         }
     }
@@ -119,7 +197,7 @@ impl Default for UnixSockAddr {
     fn default() -> Self {
         Self {
             family: AddressFamily::Unix as u16,
-            path: [0u8; 108]
+            path: [0u8; UNIX_PATH_LEN]
         }
     }
 }
