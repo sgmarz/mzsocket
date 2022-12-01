@@ -50,7 +50,7 @@ pub type UnixSockAddr = structs::UnixSockAddr;
 
 pub struct Socket {
     fd: c_int,
-    af: AddressFamily
+    af: AddressFamily,
 }
 
 impl Socket {
@@ -60,10 +60,7 @@ impl Socket {
         if ws < 0 {
             Err(ws)
         } else {
-            Ok(Self { 
-                fd: ws,
-                af: family
-            })
+            Ok(Self { fd: ws, af: family })
         }
     }
 
@@ -77,25 +74,32 @@ impl Socket {
     }
 
     pub fn listen(&mut self, backlog: i32) -> i32 {
-        unsafe {
-            listen(self.fd, backlog)
-        }
+        unsafe { listen(self.fd, backlog) }
     }
 
     pub fn acceptinet(&mut self) -> Result<(Socket, InetSockAddr), i32> {
         if self.af != AddressFamily::Inet {
-            return Err(-1)
+            return Err(-1);
         }
         let mut isaddr = InetSockAddr::default();
         let mut slen = 0u32;
         let ret = unsafe {
-            accept(self.fd, &mut isaddr as *mut InetSockAddr as *mut c_void, &mut slen as *mut u32 as *mut c_uint)
+            accept(
+                self.fd,
+                &mut isaddr as *mut InetSockAddr as *mut c_void,
+                &mut slen as *mut u32 as *mut c_uint,
+            )
         } as usize;
         if slen as usize != size_of::<InetSockAddr>() {
             Err(ret as i32)
-        }
-        else {
-            Ok((Self {fd: ret as i32, af: AddressFamily::Inet}, isaddr))
+        } else {
+            Ok((
+                Self {
+                    fd: ret as i32,
+                    af: AddressFamily::Inet,
+                },
+                isaddr,
+            ))
         }
     }
 
@@ -103,13 +107,22 @@ impl Socket {
         let mut isaddr = Inet6SockAddr::default();
         let mut slen = 0u32;
         let ret = unsafe {
-            accept(self.fd, &mut isaddr as *mut Inet6SockAddr as *mut c_void, &mut slen as *mut u32 as *mut c_uint)
+            accept(
+                self.fd,
+                &mut isaddr as *mut Inet6SockAddr as *mut c_void,
+                &mut slen as *mut u32 as *mut c_uint,
+            )
         } as usize;
         if slen as usize != size_of::<Inet6SockAddr>() {
             Err(ret as i32)
-        }
-        else {
-            Ok((Self {fd: ret as i32, af: AddressFamily::Inet6}, isaddr))
+        } else {
+            Ok((
+                Self {
+                    fd: ret as i32,
+                    af: AddressFamily::Inet6,
+                },
+                isaddr,
+            ))
         }
     }
 
@@ -117,13 +130,22 @@ impl Socket {
         let mut isaddr = UnixSockAddr::default();
         let mut slen = 0u32;
         let ret = unsafe {
-            accept(self.fd, &mut isaddr as *mut UnixSockAddr as *mut c_void, &mut slen as *mut u32 as *mut c_uint)
+            accept(
+                self.fd,
+                &mut isaddr as *mut UnixSockAddr as *mut c_void,
+                &mut slen as *mut u32 as *mut c_uint,
+            )
         } as usize;
         if slen as usize != size_of::<UnixSockAddr>() {
             Err(ret as i32)
-        }
-        else {
-            Ok((Self {fd: ret as i32, af: AddressFamily::Unix}, isaddr))
+        } else {
+            Ok((
+                Self {
+                    fd: ret as i32,
+                    af: AddressFamily::Unix,
+                },
+                isaddr,
+            ))
         }
     }
 
@@ -152,8 +174,7 @@ impl Socket {
             let ret = write(self.fd, buffer.as_ptr(), buffer.len() as u64);
             if ret < 0 {
                 Err(ret as i64)
-            }
-            else {
+            } else {
                 Ok(ret as i64)
             }
         }
@@ -165,13 +186,15 @@ impl Socket {
         const O_NONBLOCK: c_int = 0o4000;
         unsafe {
             let flags = fcntl(self.fd, F_GETFL, 0);
-            let flags = if block {
-                flags & !O_NONBLOCK
-            }
-            else {
-                flags | O_NONBLOCK
-            };
-            fcntl(self.fd, F_SETFL, flags);
+            fcntl(
+                self.fd,
+                F_SETFL,
+                if block {
+                    flags & !O_NONBLOCK
+                } else {
+                    flags | O_NONBLOCK
+                },
+            );
         }
     }
 
@@ -194,40 +217,36 @@ impl Drop for Socket {
     }
 }
 
-
-
-
-
 /// Convert an Internet version 4 address from a string
 /// into a u32 address.
-/// 
+///
 /// * Returns a `Result<u32, usize>`. If the result is Err, it will return
 /// the first index dotted quad to fail. The first dotted quad
 /// is 0, the second is 1, and so forth. If the result is Ok,
 /// the wrapped value will be a u32 of the IP address.
-/// 
+///
 /// * Unspecified values of an incomplete IP address are set to 0.
-/// 
+///
 /// * Returns in host byte order.
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```
 /// // Usage with a full IPv4 address.
 /// let addr = mzsocket::inet_addr("127.64.32.8").unwrap();
 /// // prints 0x7f402008
 /// println!("0x{:08x}", addr);
-/// 
+///
 /// // Usage and result of an incomplete IPv4 address
 /// let addr = mzsocket::inet_addr("127.64").unwrap();
 /// // prints 0x7f400000
 /// println!("0x{:08x}", addr);
-/// 
+///
 /// // Usage and result of an unparseable IPv4 address
 /// let addr = mzsocket::inet_addr("127.168.john.p");
 /// // prints Error @ 2
 /// println!("Error @ {}", addr.unwrap_err());
-/// 
+///
 /// // Usage and result of an IPv4 address with invalid numbers
 /// let addr = mzsocket::inet_addr("127.512.711.299");
 /// // prints Error @ 1
@@ -239,7 +258,7 @@ pub fn inet_addr(addr: &str) -> Result<u32, usize> {
         if let Some(k) = addrs.next() {
             let parsed_result = k.parse::<u32>();
             if parsed_result.is_err() {
-                return Err(i)
+                return Err(i);
             }
             let parsed_value = parsed_result.unwrap();
             if parsed_value > 255 {
@@ -247,9 +266,8 @@ pub fn inet_addr(addr: &str) -> Result<u32, usize> {
             }
             let bitp = 8 * (3 - i);
             ret |= parsed_value << bitp;
-        }
-        else {
-            return Ok(ret)
+        } else {
+            return Ok(ret);
         }
     }
     Ok(ret)
