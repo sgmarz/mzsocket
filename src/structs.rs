@@ -32,7 +32,7 @@ pub enum BindFamily {
 
 #[repr(C)]
 #[allow(dead_code)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum AddressFamily {
     Unspec = 0,
     Unix = 1,

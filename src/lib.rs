@@ -50,6 +50,7 @@ pub type UnixSockAddr = structs::UnixSockAddr;
 
 pub struct Socket {
     fd: c_int,
+    af: AddressFamily
 }
 
 impl Socket {
@@ -59,7 +60,10 @@ impl Socket {
         if ws < 0 {
             Err(ws)
         } else {
-            Ok(Self { fd: ws })
+            Ok(Self { 
+                fd: ws,
+                af: family
+            })
         }
     }
 
@@ -79,6 +83,9 @@ impl Socket {
     }
 
     pub fn acceptinet(&mut self) -> Result<(Socket, InetSockAddr), i32> {
+        if self.af != AddressFamily::Inet {
+            return Err(-1)
+        }
         let mut isaddr = InetSockAddr::default();
         let mut slen = 0u32;
         let ret = unsafe {
@@ -88,7 +95,7 @@ impl Socket {
             Err(ret as i32)
         }
         else {
-            Ok((Self {fd: ret as i32}, isaddr))
+            Ok((Self {fd: ret as i32, af: AddressFamily::Inet}, isaddr))
         }
     }
 
@@ -102,7 +109,7 @@ impl Socket {
             Err(ret as i32)
         }
         else {
-            Ok((Self {fd: ret as i32}, isaddr))
+            Ok((Self {fd: ret as i32, af: AddressFamily::Inet6}, isaddr))
         }
     }
 
@@ -116,7 +123,7 @@ impl Socket {
             Err(ret as i32)
         }
         else {
-            Ok((Self {fd: ret as i32}, isaddr))
+            Ok((Self {fd: ret as i32, af: AddressFamily::Unix}, isaddr))
         }
     }
 
